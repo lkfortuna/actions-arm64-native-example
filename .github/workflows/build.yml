@@ -6,6 +6,7 @@ on:
 
 env:
   GHCR_REPO: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+  DOCKER_HUB_REPO: docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}
 
 jobs:
   build:
@@ -30,6 +31,7 @@ jobs:
         with:
           images: |
             ${{ env.GHCR_REPO }}
+            ${{ env.DOCKER_HUB_REPO }}
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -37,6 +39,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -47,7 +56,8 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.GHCR_REPO }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,"name=${{ env.DOCKERHUB_REPO }},${{ env.GHCR_REPO }}",push-by-digest=true,name-canonical=true,push=true
+
 
       - name: Export digest
         run: |
@@ -82,6 +92,13 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -90,7 +107,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.GHCR_REPO }}            
+            ${{ env.GHCR_REPO }}
+            ${{ env.DOCKER_HUB_REPO }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -101,8 +119,10 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.GHCR_REPO }}@sha256:%s ' *)          
+            $(printf '${{ env.GHCR_REPO }}@sha256:%s ' *) \
+            $(printf '${{ env.DOCKER_HUB_REPO }}@sha256:%s ' *)          
 
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.GHCR_REPO }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.DOCKER_HUB_REPO }}:${{ steps.meta.outputs.version }}
