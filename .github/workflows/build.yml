@@ -54,7 +54,6 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: image/
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,"name=${{ env.DOCKER_HUB_REPO }},${{ env.GHCR_REPO }}",push-by-digest=true,name-canonical=true,push=true
